@@ -389,6 +389,7 @@ def test_pick5in7
      p score(b)
 end
 
+$g_list= []
 def sim(player_number)
     srand()
     cards = gen_cards
@@ -420,21 +421,59 @@ def sim(player_number)
         end
     end
     
+    start_cards = []
     p "public cards:#{show_cards(public_cards)}"
     for i in 0..player_number-1
         kk = score(players[i][1])
         org = players[i][0]
+        start_cards.push(org)
         p "player[#{i}]: #{show_cards(org[0..1])} --- #{show_cards(players[i][1])} #{kk[1]}"
     end
-    p "player #{g} win  !"
+    p "player #{g} win!"
+    
+    
+    
+    $g_list.push([
+        public_cards,
+        start_cards,
+        g
+    ])
     
 end
-for i in 0..100
+
+for i in 0..1000
     p "*****test #{i}******"
     #test
    # test_pick5in7
    sim(9)
 end
+
+ace_number = 0
+ace_win = 0
+ace_hand = []
+$g_list.each{|r|
+    p r
+    for i in 0..r[1].size-1
+        c = r[1][i]
+        if c[0][0] == 14 && c[1][0] == 14
+            ace_hand.push([r,i])
+            ace_number +=1
+            if r[2] == i
+                ace_win +=1
+            end
+        end
+    end
+}
+p "AA #{ace_number} win #{ace_win}"
+ace_hand.each{|h|
+    r = h[0]
+    pos = h[1]
+    p "----"
+    p "public:#{show_cards(r[0])}"
+    p "#{show_cards(r[1][pos])}"
+    p "#{show_cards(r[1][r[2]])}"
+
+}
 p "-----"
 #p is_twopairs([[2,0],[2,8],[2,4],[6,4],[6,3]])
 #p is_fullhouse([[2,0],[2,8],[2,4],[6,4],[6,3]])

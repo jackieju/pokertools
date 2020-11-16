@@ -219,13 +219,13 @@ def score(a)
         s += 6000
     elsif is_stripes(a,out)
         d = "stripes"
-        s += 30000
+        s += 3000
     elsif is_twopairs(a,out)
         d = "twopairs"
-        s += 20000
+        s += 2000
     elsif is_onepair(a,out)
         d ="one pair"
-        s += 10000
+        s += 1000
     else
         out = a.clone
         d = "high card"
@@ -237,6 +237,7 @@ end
 def compare_high(a,b)
     p a
     p b
+
     for i in 0..a.size-1
         if a[i][0] > b[i][0]
             return 1
@@ -248,10 +249,16 @@ def compare_high(a,b)
 end
 
 def compare(a, b)
+    a = sort_cards(a)
+    b = sort_cards(b)
+    
+    p "compare1:#{a}"
+    p "compare2:#{b}"
     sa = score(a) 
     p sa
     sb = score(b)
-    p sa
+    p sb
+    
     if sa[0] == sb[0]
        # if sa[0] < 1000
        #     return compare_high(a,b)
@@ -326,8 +333,8 @@ def test
         cards.delete_at(k)
     end
     
-    a = sort_cards(a)
-    b = sort_cards(b)
+ #   a = sort_cards(a)
+ #  b = sort_cards(b)
     p "==="
     p a
     p "#{show_cards(a)}  #{score(a)[1]}"
@@ -345,10 +352,88 @@ def test
     end
             
 end
+
+
+
+def pick5in7(a)
+    p "pick5in7:#{a}"
+    g = nil
+    for i in 0..6
+        for j in i+1..6
+            b =  a.clone
+            b.delete(a[i])
+            b.delete(a[j])
+            if !g ||compare(b,g) ==1
+                g = b
+            end
+        end
+    end
+    return sort_cards(g)
+end
+
+def test_pick5in7
+    srand()
+    cards = gen_cards
+    
+    a = []
+    for i in 0..6
+        k = rand(cards.size)
+        a.push(cards[k])
+        cards.delete_at(k)
+    end
+    
+    b = pick5in7(a)
+    
+    p "#{show_cards(a)}"
+     p "#{show_cards(b)} "
+     p score(b)
+end
+
+def sim(player_number)
+    srand()
+    cards = gen_cards
+    players = []
+    for i in 0..player_number-1
+        a = []
+        k = rand(cards.size)
+        a.push(cards[k])
+        cards.delete_at(k)
+        
+        k = rand(cards.size)
+        a.push(cards[k])
+        cards.delete_at(k)
+        
+        players.push([a, nil])
+    end
+    
+    public_cards = []
+    for i in 0..4
+        k = rand(cards.size)
+        public_cards.push(cards[k])
+        cards.delete_at(k)
+    end
+    g = -1
+    for i in 0..player_number-1
+        players[i][1] = pick5in7(players[i][0]+public_cards)
+        if g == -1 || compare(players[i][1], players[g][1]) ==1
+            g = i
+        end
+    end
+    
+    p "public cards:#{show_cards(public_cards)}"
+    for i in 0..player_number-1
+        kk = score(players[i][1])
+        org = players[i][0]
+        p "player[#{i}]: #{show_cards(org[0..1])} --- #{show_cards(players[i][1])} #{kk[1]}"
+    end
+    p "player #{g} win  !"
+    
+end
 for i in 0..100
     p "*****test #{i}******"
-p test
-
+    #test
+   # test_pick5in7
+   sim(9)
 end
 p "-----"
 #p is_twopairs([[2,0],[2,8],[2,4],[6,4],[6,3]])

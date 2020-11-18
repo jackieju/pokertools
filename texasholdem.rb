@@ -1,3 +1,6 @@
+require_relative "rubyutility.rb"
+require_relative "arrayparser.rb"
+
 def gen_cards
     ar = []
     for i in 0..3
@@ -18,10 +21,10 @@ def sort_cards(a)
     return a
 end
 
-cards = gen_cards
-p cards
-p cards.size
-p sort_cards(cards)
+#cards = gen_cards
+#p cards
+#p cards.size
+#p sort_cards(cards)
 
 def is_flush(a, out)
     a[0].last ==  a[1].last  && a[0].last == a[2].last && a[0].last == a[3].last && a[0].last == a[4].last
@@ -235,8 +238,8 @@ end
 
 # a, b already sorted
 def compare_high(a,b)
-    p a
-    p b
+   # p a
+   # p b
 
     for i in 0..a.size-1
         if a[i][0] > b[i][0]
@@ -252,8 +255,8 @@ def compare(a, b)
     a = sort_cards(a)
     b = sort_cards(b)
     
-    p "compare1:#{a}"
-    p "compare2:#{b}"
+    #p "compare1:#{a}"
+    #p "compare2:#{b}"
     sa = score(a) 
     p sa
     sb = score(b)
@@ -281,16 +284,18 @@ def compare(a, b)
 end
 
 
-def show_cards(a)
+def show_cards(a, only_number=false)
     r = ""
     for i in 0..a.size-1
         s = ""
         c = a[i]
-        if c[0]>10
+        if c[0]>=10
             case c[0]
-                when  11
+                when 10
+                    s += "T"
+                when 11
                      s += "J"
-                when  12
+                when 12
                      s += "Q"
                 when 13
                      s += "K"
@@ -300,17 +305,32 @@ def show_cards(a)
         else
             s += "#{c[0]}"
         end
-        case c[1]
-        when 0
-             s += "♦️"
-        when 1
-             s += "♠️"
-        when 2
-             s += "♥️"
-        when 3
-             s += "♣️"
+        
+        if !only_number
+            case c[1]
+                when 0
+                     s += "♦️"
+                when 1
+                     s += "♠️"
+                when 2
+                     s += "♥️"
+                when 3
+                     s += "♣️"
+            end
         end
-        r += "#{s}  "
+        if only_number
+            r += "#{s}"
+        else
+            r += "#{s}  "
+        end
+    end
+    
+    if a.size ==2 && only_number
+        if a[0][1] == a[1][1]
+            r += "s"
+        else
+            r += "o"
+        end
     end
     
     return r
@@ -389,29 +409,30 @@ def test_pick5in7
      p score(b)
 end
 
+def deal(cards)
+    k = rand(cards.size)
+    a = cards[k]
+    cards.delete_at(k)
+    return a
+end
 $g_list= []
 def sim(player_number)
+    
     srand()
     cards = gen_cards
     players = []
     for i in 0..player_number-1
         a = []
-        k = rand(cards.size)
-        a.push(cards[k])
-        cards.delete_at(k)
-        
-        k = rand(cards.size)
-        a.push(cards[k])
-        cards.delete_at(k)
-        
+        a.push(deal(cards))
+        a.push(deal(cards))
+        a = sort_cards(a)
+
         players.push([a, nil])
     end
     
     public_cards = []
     for i in 0..4
-        k = rand(cards.size)
-        public_cards.push(cards[k])
-        cards.delete_at(k)
+        public_cards.push(deal(cards))
     end
     g = -1
     for i in 0..player_number-1
@@ -433,47 +454,252 @@ def sim(player_number)
     
     
     
-    $g_list.push([
+   return [
         public_cards,
         start_cards,
-        g
-    ])
+        g   # winner
+    ]
     
 end
 
-for i in 0..1000
-    p "*****test #{i}******"
-    #test
-   # test_pick5in7
-   sim(9)
+def append_array_to_file(fname, ar)
+    p "append_array_to_file"
+    
+    content = ""
+    ar.each{|l|
+        content+="#{l}\n"
+        p "line:#{l}"
+    }
+    append_file(fname, content)
 end
 
-ace_number = 0
-ace_win = 0
-ace_hand = []
-$g_list.each{|r|
-    p r
-    for i in 0..r[1].size-1
-        c = r[1][i]
-        if c[0][0] == 14 && c[1][0] == 14
-            ace_hand.push([r,i])
-            ace_number +=1
-            if r[2] == i
-                ace_win +=1
+
+def load_array_from_file(fname)
+    content = read_file(fname)
+    list = []
+  #  p content
+    content.lines.each{|l|
+   # File.foreach(fname) { |l|
+    
+           #p "=>#{l}"
+       list.push(ArrayParser.new(l).parse_array())
+    }
+   # p list
+   p "#{list.size} records loaded"
+   return list
+end
+
+def run_sim(times=1000, sleep_interval=100, sleep_time=0.1)
+    list = []
+    i = 0
+    for i in 0..times
+        p "*****test #{i}******"
+        #test
+       # test_pick5in7
+       r = sim($player_num)
+      
+      list.push(r)
+        $sim_num +=1
+      if (sleep_interval)
+           if i == sleep_interval
+               sleep(sleep_time)
+               i = 0
+           else
+               i += 1
+           end
+       end
+    end
+    
+    # serialize, but not human readible, and easy to be corrupt
+    # o = Marshal.dump($g_list)
+    # Marshal.load File.read('g_list') to load
+    #append_file("g_list", o)
+    
+   # append_array_to_file($record_file, $g_list)
+   return list
+end
+
+def get_record(r)
+    return {
+        :public_cards=>r[0],
+        :start_cards=>r[1], # start cards of all players
+        :winner=>r[2] 
+    }
+end
+
+def get_record2(r)
+    return [
+            r[0], # public cards
+            r[1], # start cards of all players
+            r[2]  # winner
+        ]
+        
+end
+def hands_rank(records)
+    p "start analyze hands result..."
+    list = {}
+    records.each{|r|
+        p r
+            pc, sc, winner =  get_record2(r)
+            for i in 0..sc.size-1
+                c = sc[i]
+                cards = "#{show_cards(c, true)}"
+                 if list[cards]==nil
+                      list[cards] = {
+                          :win=>0,
+                          :total=>1
+                      }
+                 else
+                      list[cards][:total] +=1
+                 end
+                 if winner == i
+                     list[cards][:win] +=1
+                 end
+            end
+        
+    }
+    list.each{|k,l|
+        l[:winrate] = l[:win].to_f/l[:total]
+    }
+    p list
+    r = list.sort_by{|k,v|
+        v[:winrate]
+    }
+    
+    range_rank = []
+    r.each{|l|
+        p l
+        range_rank.push([l[0], l[1][:winrate]])
+    }    
+    rrs = ""
+    range_rank.each{|l|
+        rrs += l.to_s + ",\n"
+    }
+    #print rrs
+    save_to_file(rrs, "range_#{Time.now}")
+    
+    p "*** bottom 20"
+    r[0..20].reverse.each{|l|
+        p l
+    }
+
+    p "*** top 20"
+    for i in r.size-21..r.size-1
+        p r[i]
+    end    
+
+    p "total hands #{records.size}"
+    p "best hand #{r[r.size-1]}"
+end
+
+def how_AA(list)
+    ace_number = 0
+    ace_win = 0
+    ace_hand = []
+    list.each{|r|
+        p r
+        for i in 0..r[1].size-1
+            c = r[1][i] # start hand
+            if c[0][0] == 14 && c[1][0] == 14  # is AA ?
+                ace_hand.push([r,i])
+                ace_number +=1
+                if r[2] == i
+                    ace_win +=1
+                end
             end
         end
-    end
-}
-p "AA #{ace_number} win #{ace_win}"
-ace_hand.each{|h|
-    r = h[0]
-    pos = h[1]
-    p "----"
-    p "public:#{show_cards(r[0])}"
-    p "#{show_cards(r[1][pos])}"
-    p "#{show_cards(r[1][r[2]])}"
+    }
+    p "AA #{ace_number} win #{ace_win} in total #{list.size} hand"
+    ace_hand.each{|h|
+        r = h[0]
+        pos = h[1]
+        p "----"
+        p "public:#{show_cards(r[0])}"
+        p "#{show_cards(r[1][pos])}"
+        p "#{show_cards(r[1][r[2]])}"
 
-}
+    }
+end
+
+$sim_num = 0
+def run_sim_and_save(times)
+    for i in 0..times/100
+        list = run_sim(100, nil)
+        if !$norecord
+            append_array_to_file($record_file, list)
+        end
+        sleep(0.2)
+    end
+end
+
+
+
+n = 99999999999
+
+#if $*.size > 0
+#    n = $*[0].to_i
+#end
+$nosim = false
+$norank = false
+$record_file = "records_9"
+$player_num = 9
+$norecord = false
+if $*.size > 0
+    for i in 0..$*.size-1
+        cmd = $*[i]
+        if cmd == "nosim"
+            $nosim = true
+        elsif cmd == "norank"
+            $norank = true
+        elsif cmd == "norecord"
+            $norecord = true
+        elsif cmd == "-t"
+            i +=1
+            cmd = $*[i]
+            n = cmd.to_i
+        elsif cmd == "-p"
+            i += 1
+            cmd = $*[i]
+            $player_num = cmd.to_i
+            $record_file = "records_#{$player_num}"
+        end
+    end
+end
+if n < 100
+    p "times cannot less than 100"
+    return
+end
+
+t = Time.now.to_f
+if !$nosim
+    begin
+        run_sim_and_save(n)
+    rescue SystemExit, Interrupt => e
+    end
+    te = Time.now.to_f
+    p "run #{ $sim_num } sim took #{te-t}s"
+    t = te
+else
+    p "skil sim"
+end
+if !$norank
+    begin
+        records = load_array_from_file($record_file)
+    rescue SystemExit, Interrupt => e
+    end
+    te = Time.now.to_f
+    p "load #{records.size} records took #{te-t}s"
+    t = te
+    begin
+        hands_rank(records)
+    rescue SystemExit, Interrupt => e
+    end
+    te = Time.now.to_f
+    p "analyze #{records.size} hand took #{te-t}s"
+    t = te
+end
+
+
 p "-----"
 #p is_twopairs([[2,0],[2,8],[2,4],[6,4],[6,3]])
 #p is_fullhouse([[2,0],[2,8],[2,4],[6,4],[6,3]])

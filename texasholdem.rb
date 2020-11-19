@@ -58,8 +58,8 @@ def is_fullhouse(a,out)
     return false if !find
     
     b = [0,1,2,3,4] - s
-    p a
-    p b
+    #p a
+    #p b
     if a[b[0]][0] == a[b[1]][0]
         out.push(a[b[0]])
         out.push(a[b[1]])
@@ -189,6 +189,7 @@ def is_fourofakind(a, out)
 end
 # score of cards array
 # a alreadys sorted
+# return [score, desc, reordered_cards]
 def score(a)
     # flush straight    8000
     # four of a kind    7000
@@ -258,9 +259,9 @@ def compare(a, b)
     #p "compare1:#{a}"
     #p "compare2:#{b}"
     sa = score(a) 
-    p sa
+  #  p sa
     sb = score(b)
-    p sb
+  #  p sb
     
     if sa[0] == sb[0]
        # if sa[0] < 1000
@@ -326,11 +327,17 @@ def show_cards(a, only_number=false)
     end
     
     if a.size ==2 && only_number
+        #if a[0][0] == a[1][0] 
+        #    p "==>#{a}, #{a[0][1]}, #{a[1][1]}， #{a[0][1]==a[1][1]}"
+        #end
         if a[0][1] == a[1][1]
             r += "s"
         else
             r += "o"
         end
+        #if  a[0][0] == a[1][0] && a[0][1] == a[1][1]
+        #   p "ssssss:#{r}"
+        #end
     end
     
     return r
@@ -376,7 +383,7 @@ end
 
 
 def pick5in7(a)
-    p "pick5in7:#{a}"
+    #p "pick5in7:#{a}"
     g = nil
     for i in 0..6
         for j in i+1..6
@@ -405,8 +412,8 @@ def test_pick5in7
     b = pick5in7(a)
     
     p "#{show_cards(a)}"
-     p "#{show_cards(b)} "
-     p score(b)
+    p "#{show_cards(b)} "
+    p score(b)
 end
 
 def deal(cards)
@@ -434,26 +441,29 @@ def sim(player_number)
     for i in 0..4
         public_cards.push(deal(cards))
     end
+    p "public cards:#{show_cards(public_cards)}"
     g = -1
+    start_cards = []
+   # scores = []
     for i in 0..player_number-1
+        start_cards.push(players[i][0])
         players[i][1] = pick5in7(players[i][0]+public_cards)
-        if g == -1 || compare(players[i][1], players[g][1]) ==1
+        if g == -1 || compare(players[i][1], players[g][1]) == 1
             g = i
         end
-    end
-    
-    start_cards = []
-    p "public cards:#{show_cards(public_cards)}"
-    for i in 0..player_number-1
-        kk = score(players[i][1])
-        org = players[i][0]
-        start_cards.push(org)
-        p "player[#{i}]: #{show_cards(org[0..1])} --- #{show_cards(players[i][1])} #{kk[1]}"
+        players[i][2] = score(players[i][1])
+     #   scores.push(players[i][2])
     end
     p "player #{g} win!"
-    
-    
-    
+   
+
+    for i in 0..player_number-1
+        kk = players[i][2]
+        org = players[i][0]
+        p "player[#{i}]: #{show_cards(org[0..1])} --- #{show_cards(players[i][1])} #{kk[1]}"
+    end
+
+   
    return [
         public_cards,
         start_cards,
@@ -463,12 +473,12 @@ def sim(player_number)
 end
 
 def append_array_to_file(fname, ar)
-    p "append_array_to_file"
+    #p "append_array_to_file"
     
     content = ""
     ar.each{|l|
         content+="#{l}\n"
-        p "line:#{l}"
+        #p "line:#{l}"
     }
     append_file(fname, content)
 end
@@ -476,14 +486,31 @@ end
 
 def load_array_from_file(fname)
     content = read_file(fname)
+    if content == nil
+        raise "load file #{fname} failed"
+    end
+    p "file #{fname} loaded, size #{content.size}"
     list = []
+    i = 0
   #  p content
     content.lines.each{|l|
    # File.foreach(fname) { |l|
     
            #p "=>#{l}"
-       list.push(ArrayParser.new(l).parse_array())
+        list.push(ArrayParser.new(l).parse_array())
+        i +=1
+        if i % 1000 == 0
+            print "loading #{i}th record\r"
+        end
+
+         #
+         #print "\\\r"
+         #print "|\r"
+         #print "/\r"
+     
+       
     }
+            print "\n"
    # p list
    p "#{list.size} records loaded"
    return list
@@ -538,44 +565,68 @@ end
 def hands_rank(records)
     p "start analyze hands result..."
     list = {}
+    count = 0
     records.each{|r|
-        p r
+    #    p r
             pc, sc, winner =  get_record2(r)
+            scores = []
+            for i in 0..sc.size-1
+                c = pick5in7(sc[i]+pc)
+                scores.push(score(c)[0])
+            end
+            scores = scores.sort().reverse()
+            win_equity = scores[0]+scores[1]
+            #p "scores:#{scores}"
+    
+
             for i in 0..sc.size-1
                 c = sc[i]
                 cards = "#{show_cards(c, true)}"
                  if list[cards]==nil
                       list[cards] = {
                           :win=>0,
-                          :total=>1
+                          :total=>1,
+                          :equity =>0
                       }
                  else
                       list[cards][:total] +=1
                  end
                  if winner == i
                      list[cards][:win] +=1
+                     list[cards][:equity] += win_equity
                  end
+            end
+
+            count +=1
+            if count%1000 == 0
+                print "processed #{count} game\n"
+                sleep(0.1)
             end
         
     }
     list.each{|k,l|
         l[:winrate] = l[:win].to_f/l[:total]
+        l[:rate] = l[:total].to_f / records.size
+        l[:x] = l[:equity] * l[:rate] 
     }
+    
     p list
     r = list.sort_by{|k,v|
         v[:winrate]
     }
     
+    # save range
     range_rank = []
     r.each{|l|
         p l
         range_rank.push([l[0], l[1][:winrate]])
     }    
-    rrs = ""
+    rrs = "\##{$player_num} player table from #{records.size} hand\n"
     range_rank.each{|l|
         rrs += l.to_s + ",\n"
     }
     #print rrs
+    
     save_to_file(rrs, "range_#{Time.now}")
     
     p "*** bottom 20"
@@ -587,7 +638,27 @@ def hands_rank(records)
     for i in r.size-21..r.size-1
         p r[i]
     end    
+    
+    # by equity
+    r = list.sort_by{|k,v|
+        v[:equity]
+    }
 
+    p "*** top 20 equity"
+    for i in r.size-21..r.size-1
+        p r[i]
+    end  
+    
+    
+    # by x
+    r = list.sort_by{|k,v|
+        v[:x]
+    }
+    p "*** top 20 x"
+    for i in r.size-21..r.size-1
+        p r[i]
+    end  
+       
     p "total hands #{records.size}"
     p "best hand #{r[r.size-1]}"
 end
@@ -597,7 +668,7 @@ def how_AA(list)
     ace_win = 0
     ace_hand = []
     list.each{|r|
-        p r
+        #p r
         for i in 0..r[1].size-1
             c = r[1][i] # start hand
             if c[0][0] == 14 && c[1][0] == 14  # is AA ?
@@ -664,6 +735,9 @@ if $*.size > 0
             $record_file = "records_#{$player_num}"
         end
     end
+else
+    print_usage
+    exit
 end
 if n < 100
     p "times cannot less than 100"
@@ -680,10 +754,11 @@ if !$nosim
     p "run #{ $sim_num } sim took #{te-t}s"
     t = te
 else
-    p "skil sim"
+    p "skip sim"
 end
 if !$norank
     begin
+        p "load records from #{$record_file}"
         records = load_array_from_file($record_file)
     rescue SystemExit, Interrupt => e
     end
@@ -699,7 +774,13 @@ if !$norank
     t = te
 end
 
-
+def print_usage()
+    print "ruby texasholdem.rb -p <times> -t <player number> norank nosim norecord \n"
+    print "Times default is never stop \n"
+    print "Player number is 9 \n"
+    print "By default will do simulation while recording to file, and do ranking afterwards."
+    print "If you only analyze records, useing 'ruby texasholdem.rb nosim'"
+end
 p "-----"
 #p is_twopairs([[2,0],[2,8],[2,4],[6,4],[6,3]])
 #p is_fullhouse([[2,0],[2,8],[2,4],[6,4],[6,3]])

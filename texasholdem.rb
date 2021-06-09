@@ -1,6 +1,16 @@
 require_relative "rubyutility.rb"
 require_relative "arrayparser.rb"
 
+def print_usage()
+    print "===== usage ======\n"
+    print "ruby texasholdem.rb -t <times> -p <player number> norank nosim norecord \n"
+    print "Times default is never stop， press control-c to stop. \n"
+   # print "Player number is 9 \n"
+    print "By default will do simulation while recording to file, and do ranking using records in file afterwards.\n"
+    print "If specify norecord, analyzing will only use record in memory.\n"
+    print "If you only analyze records, using 'ruby texasholdem.rb nosim'\n"
+end
+
 def gen_cards
     ar = []
     for i in 0..3
@@ -493,24 +503,27 @@ def load_array_from_file(fname)
     list = []
     i = 0
   #  p content
-    content.lines.each{|l|
-   # File.foreach(fname) { |l|
+    begin # can be interrupt
+        content.lines.each{|l|
+       # File.foreach(fname) { |l|
     
-           #p "=>#{l}"
-        list.push(ArrayParser.new(l).parse_array())
-        i +=1
-        if i % 1000 == 0
-            print "loading #{i}th record\r"
-        end
+               #p "=>#{l}"
+            list.push(ArrayParser.new(l).parse_array())
+            i +=1
+            if i % 1000 == 0
+                print "loading #{i}th record\r"
+            end
 
-         #
-         #print "\\\r"
-         #print "|\r"
-         #print "/\r"
+             #
+             #print "\\\r"
+             #print "|\r"
+             #print "/\r"
      
-       
-    }
-            print "\n"
+        }
+    rescue SystemExit, Interrupt => e
+    end
+    print "\n"
+   
    # p list
    p "#{list.size} records loaded"
    return list
@@ -520,12 +533,13 @@ def run_sim(times=1000, sleep_interval=100, sleep_time=0.1)
     list = []
     i = 0
     for i in 0..times
-        p "*****test #{i}******"
+        p "*****test #{i}/#{$sim_num}******"
         #test
        # test_pick5in7
        r = sim($player_num)
       
       list.push(r)
+      $g_list.push(r)
         $sim_num +=1
       if (sleep_interval)
            if i == sleep_interval
@@ -566,47 +580,61 @@ def hands_rank(records)
     p "start analyze hands result..."
     list = {}
     count = 0
+    begin # can be interrupt
     records.each{|r|
-    #    p r
-            pc, sc, winner =  get_record2(r)
-            scores = []
-            for i in 0..sc.size-1
-                c = pick5in7(sc[i]+pc)
-                scores.push(score(c)[0])
-            end
-            scores = scores.sort().reverse()
-            win_equity = scores[0]+scores[1]
-            #p "scores:#{scores}"
+        #    p r
+                pc, sc, winner =  get_record2(r)
+                scores = []
+                for i in 0..sc.size-1
+                    c = pick5in7(sc[i]+pc)
+                    scores.push([i,score(c)[0]])
+                end
+                
+                scores = scores.sort_by{|e|
+                    e[1]
+                }.reverse()
+                
+                win_equity = scores[0][1]+scores[1][1]
+                loser = scores[1][0]
+                #p "scores:#{scores}"
     
 
-            for i in 0..sc.size-1
-                c = sc[i]
-                cards = "#{show_cards(c, true)}"
-                 if list[cards]==nil
-                      list[cards] = {
-                          :win=>0,
-                          :total=>1,
-                          :equity =>0
-                      }
-                 else
-                      list[cards][:total] +=1
-                 end
-                 if winner == i
-                     list[cards][:win] +=1
-                     list[cards][:equity] += win_equity
-                 end
-            end
+                for i in 0..sc.size-1
+                    c = sc[i]
+                    cards = "#{show_cards(c, true)}"
+                     if list[cards]==nil
+                          list[cards] = {
+                              :win=>0,
+                              :total=>1,
+                              :equity =>0
+                          }
+                     else
+                          list[cards][:total] +=1
+                     end
 
-            count +=1
-            if count%1000 == 0
-                print "processed #{count} game\n"
-                sleep(0.1)
-            end
+                     if winner == i
+                         list[cards][:win] +=1
+                         list[cards][:equity] += win_equity
+                     end
+                     if loser == i
+                         list[cards][:equity] -= win_equity
+                     end
+                 
+                end
+
+                count +=1
+                if count%1000 == 0
+                    print "processed #{count} game\n"
+                    sleep(0.2)
+                end
         
-    }
+        }
+    rescue SystemExit, Interrupt => e
+    end
     list.each{|k,l|
         l[:winrate] = l[:win].to_f/l[:total]
-        l[:rate] = l[:total].to_f / records.size
+        l[:rate] = l[:total].to_f / count
+        l[:equity] = l[:equity] / l[:total]
         l[:x] = l[:equity] * l[:rate] 
     }
     
@@ -621,7 +649,7 @@ def hands_rank(records)
         p l
         range_rank.push([l[0], l[1][:winrate]])
     }    
-    rrs = "\##{$player_num} player table from #{records.size} hand\n"
+    rrs = "\##{$player_num} player table from #{count} hand\n"
     range_rank.each{|l|
         rrs += l.to_s + ",\n"
     }
@@ -644,22 +672,22 @@ def hands_rank(records)
         v[:equity]
     }
 
-    p "*** top 20 equity"
-    for i in r.size-21..r.size-1
+    p "*** by equity"
+    for i in 0..r.size-1
         p r[i]
     end  
     
     
     # by x
-    r = list.sort_by{|k,v|
-        v[:x]
-    }
-    p "*** top 20 x"
-    for i in r.size-21..r.size-1
-        p r[i]
-    end  
+    #r = list.sort_by{|k,v|
+    #    v[:x]
+    #}
+    #p "*** top 20 x"
+    #for i in r.size-21..r.size-1
+    #    p r[i]
+    #end  
        
-    p "total hands #{records.size}"
+    p "total hands #{count}"
     p "best hand #{r[r.size-1]}"
 end
 
@@ -736,7 +764,7 @@ if $*.size > 0
         end
     end
 else
-    print_usage
+    print_usage()
     exit
 end
 if n < 100
@@ -758,8 +786,12 @@ else
 end
 if !$norank
     begin
-        p "load records from #{$record_file}"
-        records = load_array_from_file($record_file)
+         if !$norecord
+             p "load records from #{$record_file}"
+             records = load_array_from_file($record_file)
+         else 
+             records = $g_list
+         end
     rescue SystemExit, Interrupt => e
     end
     te = Time.now.to_f
@@ -770,17 +802,11 @@ if !$norank
     rescue SystemExit, Interrupt => e
     end
     te = Time.now.to_f
-    p "analyze #{records.size} hand took #{te-t}s"
+    p "analyze #{records.size} hands for #{$player_num} players took #{te-t}s"
     t = te
 end
 
-def print_usage()
-    print "ruby texasholdem.rb -p <times> -t <player number> norank nosim norecord \n"
-    print "Times default is never stop \n"
-    print "Player number is 9 \n"
-    print "By default will do simulation while recording to file, and do ranking afterwards."
-    print "If you only analyze records, useing 'ruby texasholdem.rb nosim'"
-end
+
 p "-----"
 #p is_twopairs([[2,0],[2,8],[2,4],[6,4],[6,3]])
 #p is_fullhouse([[2,0],[2,8],[2,4],[6,4],[6,3]])

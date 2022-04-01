@@ -11,10 +11,11 @@ def print_usage()
     print "If you only analyze records, using 'ruby texasholdem.rb nosim'\n"
 end
 
+# generate one full set of cards without flush
 def gen_cards
     ar = []
-    for i in 0..3
-        for j in 2..14
+    for i in 0..3 # color 
+        for j in 2..14  # card 
             #ar.push("#{j.to_s(16)}#{i}")
             #ar.push("#{j.to_s(16)}#{i}".chars)
             ar.push([j, i])
@@ -79,7 +80,7 @@ def is_fullhouse(a,out)
 end
 
 
-def is_stripes(a,out)
+def is_tripes(a,out)
     out.clear
     for i in 0 .. a.size-1
         s = [i]
@@ -231,8 +232,8 @@ def score(a)
     elsif is_fullhouse(a,out)
         d = "fullhouse"
         s += 6000
-    elsif is_stripes(a,out)
-        d = "stripes"
+    elsif is_tripes(a,out)
+        d = "tripes"
         s += 3000
     elsif is_twopairs(a,out)
         d = "twopairs"
@@ -294,7 +295,7 @@ def compare(a, b)
     end
 end
 
-
+# translate cards to human-readable representation
 def show_cards(a, only_number=false)
     r = ""
     for i in 0..a.size-1
@@ -438,6 +439,8 @@ def sim(player_number)
     srand()
     cards = gen_cards
     players = []
+    
+    # repflop deal cards
     for i in 0..player_number-1
         a = []
         a.push(deal(cards))
@@ -540,7 +543,7 @@ def run_sim(times=1000, sleep_interval=100, sleep_time=0.1)
       
       list.push(r)
       $g_list.push(r)
-        $sim_num +=1
+      $sim_num +=1
       if (sleep_interval)
            if i == sleep_interval
                sleep(sleep_time)
@@ -583,7 +586,7 @@ def hands_rank(records)
     begin # can be interrupt
     records.each{|r|
         #    p r
-                pc, sc, winner =  get_record2(r)
+                pc, sc, winner =  get_record2(r). # public cards, hand cards, winner
                 scores = []
                 for i in 0..sc.size-1
                     c = pick5in7(sc[i]+pc)
